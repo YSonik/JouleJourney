@@ -4,6 +4,7 @@ import { GoogleMapsModule } from '@angular/google-maps';
 
 import { AppComponent } from './app.component';
 import { MapComponent } from './map/map.component';
+import { GoogleMapsService } from './services/google-maps.service'
 
 @NgModule({
   declarations: [
@@ -14,7 +15,7 @@ import { MapComponent } from './map/map.component';
     BrowserModule,
     GoogleMapsModule
   ],
-  providers: [],
+  providers: [GoogleMapsService],
   bootstrap: [AppComponent]
 })
 export class AppModule { }
