@@ -1,3 +1,6 @@
+# Environment Variables
+./Front_End/src/environments/
+
 # Logs
 logs
 *.log
