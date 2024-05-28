@@ -4,8 +4,10 @@ import { GoogleMapsModule } from '@angular/google-maps';
 
 import { AppComponent } from './app.component';
 import { MapComponent } from './map/map.component';
-import { GoogleMapsService } from './services/google-maps.service';
 import { JourneySearchComponent } from './map/journey-search/journey-search.component'
+
+import { GoogleMapsService } from './services/google-maps.service';
+import { RoutingAlgorithmService } from './services/routing-algorithm.service'
 
 @NgModule({
   declarations: [
@@ -17,7 +19,7 @@ import { JourneySearchComponent } from './map/journey-search/journey-search.comp
     BrowserModule,
     GoogleMapsModule
   ],
-  providers: [GoogleMapsService],
+  providers: [GoogleMapsService, RoutingAlgorithmService],
   bootstrap: [AppComponent]
 })
 export class AppModule { }
