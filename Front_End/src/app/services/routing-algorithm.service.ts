@@ -6,11 +6,16 @@ type journey_data = {
   range_string: string;
 }
 
-type charger_object = {
-  photo: any;
+type station_object = {
+  place_id: any;
   name: any;
   rating: any;
+  address: any;
   geometry: any;
+  distance_to_origin: any;
+  time_to_origin: any;
+  distance_to_destination: any;
+  time_to_destination: any;
 };
 
 @Injectable({
@@ -30,7 +35,9 @@ export class RoutingAlgorithmService {
   #current_vehicle_range!:number;
   #journey_distance!: any;
 
-  #charger_objects:any[] = [];
+  #station_objects:any[] = [];
+  #optimal_stations:any = [];
+  #final_route:any = [];
   
   constructor() 
   { 
@@ -38,19 +45,121 @@ export class RoutingAlgorithmService {
     this.#destination_ready = false;
   }
 
+  selectStation()
+  {
+    let num_stations = this.#station_objects.length;
+    let chosen_index = 0;
 
-  findCharger(origin_coords: google.maps.LatLng,
+    for(let i=0; i<num_stations; i++)
+    {
+      let current_station = this.#station_objects[i];
+      //The chosen station must be within current_range and have the shortest distance to the destination.
+      if(current_station.distance_to_origin < this.#current_vehicle_range &&
+         current_station.distance_to_destination <= this.#station_objects[chosen_index].distance_to_destination)
+      {
+        chosen_index = i;
+      }
+    }
+
+    //Edge Case #1: None of the stations satisfy the conditions thus no route possible.
+    if(chosen_index == 0 &&
+       this.#station_objects[chosen_index].distance_to_origin >= this.#current_vehicle_range)
+    {
+      alert("No Route 1: There are insufficient stations within your current_range.");
+      return -1;
+    }
+
+    return chosen_index;
+  }
+
+
+  constructRoute(origin_coords: google.maps.LatLng,
+                 destination_coords: google.maps.LatLng,
+                 places_service: google.maps.places.PlacesService,
+                 directions_service: google.maps.DirectionsService,
+                 directions_render_service: google.maps.DirectionsRenderer,
+                 distance_matrix_service: google.maps.DistanceMatrixService)
+  {
+
+    //Step 1: Make a greedy station selection based on distance.
+    let chosen_index: number = this.selectStation();
+    if(chosen_index == -1)
+    {
+        return;
+    }
+
+    //Step 2: Ensure that the chosen station is unique in your optimal_stations.
+    
+
+  }
+
+
+  getDistanceMatrix(origin_coords: google.maps.LatLng,
+                    destination_coords: google.maps.LatLng,
+                    places_service: google.maps.places.PlacesService,
+                    directions_service: google.maps.DirectionsService,
+                    directions_render_service: google.maps.DirectionsRenderer,
+                    distance_matrix_service: google.maps.DistanceMatrixService)
+  {
+    //Create a copy of the station_objects array that only contains station coordinates.
+    let way_points = [];
+    for(let i=0; i<this.#station_objects.length; i++)
+    {
+      way_points.push(this.#station_objects[i].geometry);
+    }
+
+    let distanceMatrix_request: any = {
+      origins: [origin_coords, destination_coords],
+      destinations: way_points,
+      travelMode: 'DRIVING'
+    };
+
+    distance_matrix_service.getDistanceMatrix(distanceMatrix_request, (results, status) => {
+
+      if(status == google.maps.DistanceMatrixStatus.OK && results != null)
+      {
+        //Extract the distance/time to origin and distance/time to destination for each station.
+        for(let i=0; i<this.#station_objects.length; i++)
+        {
+          let current_station = this.#station_objects[i];
+          current_station.distance_to_origin = results.rows[0].elements[i].distance.value;
+          current_station.time_to_origin = results.rows[0].elements[i].duration.value;
+          
+          current_station.distance_to_destination = results.rows[1].elements[i].distance.value;
+          current_station.time_to_destination = results.rows[1].elements[i].duration.value;
+        }
+
+        //Construct the route by selecting the optimal stations.
+        this.constructRoute(origin_coords,
+                            destination_coords,
+                            places_service,
+                            directions_service,
+                            directions_render_service,
+                            distance_matrix_service);
+      }
+      else
+      {
+        alert("Error 4: Couldn't compute distance matrix for specified stations.");
+      }
+
+    });
+
+
+
+  }
+
+
+  findStation(origin_coords: google.maps.LatLng,
               destination_coords: google.maps.LatLng,
               places_service: google.maps.places.PlacesService,
               directions_service: google.maps.DirectionsService,
               directions_render_service: google.maps.DirectionsRenderer,
               distance_matrix_service: google.maps.DistanceMatrixService)
   {
-    //Search for charging stations within a current_range radius of the origin.
+    //Search for charging/gas stations within a current_range radius of the origin.
     let search_request = {
       location: origin_coords,
       query: 'Electric Car Charger or Tesla Supercharger',
-      fields: ['geometry'],
       radius: this.#current_vehicle_range
     };
 
@@ -60,32 +169,41 @@ export class RoutingAlgorithmService {
       if(status == google.maps.places.PlacesServiceStatus.OK && results != null)
       {
         let num_chargers = results.length;
+        this.#station_objects = [];
 
-        this.#charger_objects = [];
         for (let i=0; i<num_chargers; i++) {
-          let current_charger: charger_object = {
-            photo: "",
+          let current_station: station_object = {
+            place_id: results[i].place_id,
             name: results[i].name,
             rating: results[i].rating,
-            geometry: results[i].geometry?.location
+            address: results[i].formatted_address,
+            geometry: results[i].geometry?.location,
+            distance_to_origin: 0,
+            time_to_origin: 0,
+            distance_to_destination: 0,
+            time_to_destination: 0
           }
-          this.#charger_objects.push(current_charger);
+          this.#station_objects.push(current_station);
         }
-        console.log(this.#charger_objects);
-         //getDistanceMatrix(origin_coords, destination_coords, waypoint_objects);
+
+        this.getDistanceMatrix(origin_coords,
+                               destination_coords,
+                               places_service,
+                               directions_service,
+                               directions_render_service,
+                               distance_matrix_service);
       }
       else
       {
-        alert("Error: couldn't find chargers in the specified radius.");
+        alert("Error 3: Couldn't find any stations in the specified radius.");
       }
-
     });
   }
 
 
-  chargingRequired()
+  stationRequired()
   {
-    return ((this.#current_vehicle_range*0.8) <= this.#journey_distance); //Journey distance must be less than 80% of current_range for direct routing. 
+    return (this.#current_vehicle_range <= this.#journey_distance); //Journey distance must be less than the current_range for direct routing. 
   }
 
 
@@ -109,14 +227,16 @@ export class RoutingAlgorithmService {
       { 
         //Extract the journey distance from the result.
         this.#journey_distance = results.routes[0].legs[0].distance?.value;
-        console.log(`The distance from ${this.#origin_data.name} to ${this.#destination_data.name} is ${this.#journey_distance} meters\n`);
-        console.log(`Your vehicle's range is ${this.#max_vehicle_range} meters\n`);
+        let start_address = results.routes[0].legs[0].start_address;
+        let stop_address = results.routes[0].legs[0].end_address;
+        console.log(`The distance from ${start_address} to ${stop_address} is ${this.#journey_distance} meters.\n`);
+        console.log(`Your vehicle's current range is ${this.#current_vehicle_range} meters.\n`);
 
-        //Determine whether charging-stops are needed.
-        if(this.chargingRequired())
+        //Determine whether station-stops are needed.
+        if(this.stationRequired())
         {
-          //Recursively append charging stations until charging is not required.
-          this.findCharger(origin_coords,
+          //Recursively append charging/gas stations until destination is within current_range.
+          this.findStation(origin_coords,
                            destination_coords, 
                            places_service,
                            directions_service,
@@ -131,9 +251,8 @@ export class RoutingAlgorithmService {
       }
       else
       {
-        alert("Error: Couldn't get directions from origin to destination.")
+        alert("Error 2: Couldn't get directions from the origin to the destination.")
       }
-
     });
   }
 
@@ -188,7 +307,7 @@ export class RoutingAlgorithmService {
       else
       {
         this.#origin_data = null;
-        alert("Couldn't find the specified origin.");
+        alert("Error 1: Couldn't find the specified origin.");
       }
       this.#origin_ready = true;
     });
@@ -206,7 +325,7 @@ export class RoutingAlgorithmService {
       else
       {
         this.#destination_data = null;
-        alert("Couldn't find the specified destination.");
+        alert("Error 1: Couldn't find the specified destination.");
       }
       this.#destination_ready = true;
     });
