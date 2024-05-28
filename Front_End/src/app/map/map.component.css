@@ -2,5 +2,6 @@
 {
     width:95vw;
     height:95vh;
-    background-color: white;
+    border-radius: 20px;
+    background-color: whitesmoke;
 }

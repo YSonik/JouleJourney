@@ -1,0 +1,36 @@
+<table id="embedded_search" class="primary_color secondary_color">
+    <tr>
+        <th id="app_title" class="text_format">
+            <img id="app_icon" src="../../../assets/chargingStation.png" alt="Image of charging station.">
+            JouleJourney
+        </th>
+    </tr>
+
+    <tr>
+        <td>
+            <label for="origin_input" class="text_format">Origin</label>
+            <input id="origin_input" type="text" placeholder="Enter the name of a place" maxlength="20" autofocus>
+        </td>
+    </tr>
+
+    <tr>
+        <td>
+            <label for="destination_input" class="text_format">Destination</label>
+            <input id="destination_input" type="text" placeholder="Enter the name of a place" maxlength="20">
+        </td>
+    </tr>
+
+    <tr>
+        <td>
+            <label for="range_input" class="text_format">Vehicle Range (KM)</label>
+            <input id="range_input" type="number" placeholder="Enter a number">
+        </td>
+    </tr>
+
+    <tr>
+        <td>
+            <input id="navigate_button" class="accent_color text_format" type="button" value="Navigate" (click)="create_journey()">
+        </td>
+    </tr>
+
+</table>

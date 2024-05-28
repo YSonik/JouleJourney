@@ -4,12 +4,14 @@ import { GoogleMapsModule } from '@angular/google-maps';
 
 import { AppComponent } from './app.component';
 import { MapComponent } from './map/map.component';
-import { GoogleMapsService } from './services/google-maps.service'
+import { GoogleMapsService } from './services/google-maps.service';
+import { JourneySearchComponent } from './map/journey-search/journey-search.component'
 
 @NgModule({
   declarations: [
     AppComponent,
-    MapComponent
+    MapComponent,
+    JourneySearchComponent
   ],
   imports: [
     BrowserModule,
