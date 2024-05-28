@@ -17,7 +17,7 @@ export class JourneySearchComponent implements OnInit{
   #destination_element!:HTMLInputElement;
   #range_element!:HTMLInputElement;
 
-  request_journey()
+  requestJourney()
   {
     //Extract the values from the three input fields.
     let data: journey_data = {
