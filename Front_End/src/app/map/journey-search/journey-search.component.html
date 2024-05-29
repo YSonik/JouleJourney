@@ -1,7 +1,13 @@
 <table id="embedded_search" class="primary_color secondary_color">
     <tr>
         <th id="app_title" class="text_format">
-            <img id="app_icon" src="../../../assets/chargingStation.png" alt="Image of charging station.">
+            
+            <img id="charger_icon" src="../../../assets/chargingStation.png" alt="Image of charging station.">
+            <label class="switch">
+                <input id="fuel_button" type="checkbox" (click)="requestChangeFuel()">
+                <span class="slider"></span>
+            </label>
+            <img id="gas_icon" src="../../../assets/gasStation.png" alt="Image of gas station.">
             JouleJourney
         </th>
     </tr>

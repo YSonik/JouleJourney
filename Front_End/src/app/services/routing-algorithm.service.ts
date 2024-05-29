@@ -34,6 +34,12 @@ export class RoutingAlgorithmService {
   #max_vehicle_range!: number;
   #current_vehicle_range!:number;
   #journey_distance!: any;
+  #fuel_type = "electricity";
+  #fuel_queries = new Map([
+    ["electricity", 'Electric vehicle charging station'],
+    ["gasoline", 'Gas station']
+  ]);
+  
 
   #station_objects:any[] = [];
   #optimal_stations:any = [];
@@ -159,7 +165,7 @@ export class RoutingAlgorithmService {
     //Search for charging/gas stations within a current_range radius of the origin.
     let search_request = {
       location: origin_coords,
-      query: 'Electric Car Charger or Tesla Supercharger',
+      query: this.#fuel_queries.get(this.#fuel_type),
       radius: this.#current_vehicle_range
     };
 
@@ -333,7 +339,8 @@ export class RoutingAlgorithmService {
   }
 
 
-  constructJourney(data: journey_data, 
+  constructJourney(data: journey_data,
+                   fuel_type: string, 
                    places_service: google.maps.places.PlacesService,
                    directions_service: google.maps.DirectionsService,
                    directions_render_service: google.maps.DirectionsRenderer,
@@ -344,6 +351,7 @@ export class RoutingAlgorithmService {
     
     this.#max_vehicle_range = (parseInt(data.range_string)*1000);
     this.#current_vehicle_range = this.#max_vehicle_range;
+    this.#fuel_type = fuel_type;
     this.waitForPlaces(places_service, directions_service, directions_render_service, distance_matrix_service);
 
   }

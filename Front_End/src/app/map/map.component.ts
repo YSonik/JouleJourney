@@ -8,6 +8,10 @@ type journey_data = {
   range_string: string;
 }
 
+type fuel_data = {
+  fuel_type: string;
+};
+
 @Component({
   selector: 'embedded-map',
   templateUrl: './map.component.html',
@@ -25,6 +29,7 @@ export class MapComponent implements OnInit {
   #directions_service!: google.maps.DirectionsService;
   #directions_render_service!: google.maps.DirectionsRenderer;
   #distance_matrix_service!: google.maps.DistanceMatrixService;
+  #fuel_type: string = "electricity";
 
   
   #renderMap()
@@ -70,7 +75,7 @@ export class MapComponent implements OnInit {
   {
     //Load the google maps libraries.
     this.#map_api_key = this.googleMapsService.getApiKey();
-    this.#loadScript();
+    //this.#loadScript();
   }
 
   constructor(private googleMapsService: GoogleMapsService, private routingAlgorithmService: RoutingAlgorithmService)
@@ -80,7 +85,12 @@ export class MapComponent implements OnInit {
 
   createJourney(data: journey_data)
   {
-    this.routingAlgorithmService.constructJourney(data, this.#places_service, this.#directions_service, this.#directions_render_service, this.#distance_matrix_service);
+    this.routingAlgorithmService.constructJourney(data, this.#fuel_type, this.#places_service, this.#directions_service, this.#directions_render_service, this.#distance_matrix_service);
+  }
+
+  changeFuel(data: fuel_data)
+  {
+    this.#fuel_type = data.fuel_type;
   }
 
 }

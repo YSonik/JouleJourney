@@ -12,18 +12,87 @@
     padding: 10px;
 }
 
+#charger_icon
+{
+    width: 50px;
+    height: 50px;
+    padding-bottom: 8px;
+    padding-left: 20px;
+}
+
+#gas_icon
+{
+    width: 90px;
+    height: 70px;
+}
+
+/* Toogle switch used to change between chargerStations and gasStations. */
+/* The switch container which determines its size. */
+.switch 
+{
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 34px;
+}
+
+/* Hide the default checkbox. */
+.switch input 
+{
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+/* Create the track within which the circular slider will move. */
+.slider
+{
+    position: absolute;
+    cursor: pointer;
+    top: -20px;
+    left: 10px;
+    right: -10px;
+    bottom: 18px;
+    background-color: #ADD8E6;
+    transition: .4s;
+    border-radius: 34px;
+    border-style: solid;
+    border-color: #969696;
+    border-width: 3px;
+}
+
+/* Create the circular slider that moves within the track. */
+.slider:before 
+{
+    position: absolute;
+    content: "";
+    height: 26px;
+    width: 26px;
+    left: 5px;
+    bottom: 2px;
+    background-color: #7F7F7F;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+/* When the slider is "checked", change the track color to red. */
+input:checked + .slider 
+{
+    background-color: #FF9999;
+}
+
+/* When the slider is "checked", move the slider to the right. */
+input:checked + .slider:before
+{
+    transform: translateX(20px);
+}
+
 #app_title
 {
     font-size: 30px;
     font-weight: bold;
     display: block;
     margin: 0 auto;
-}
-
-#app_icon
-{
-    width: 50px;
-    height: 50px;
 }
 
 #origin_input
