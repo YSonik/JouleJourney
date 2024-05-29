@@ -30,20 +30,26 @@ export class RoutingAlgorithmService {
   #destination_data!: any;
   #destination_ready: boolean;
   
-  #moving_origin_data!: any;
   #max_vehicle_range!: number;
-  #current_vehicle_range!:number;
+  #current_vehicle_range!: number;
   #journey_distance!: any;
+  
   #fuel_type = "electricity";
   #fuel_queries = new Map([
     ["electricity", 'Electric vehicle charging station'],
     ["gasoline", 'Gas station']
   ]);
   
-
-  #station_objects:any[] = [];
-  #optimal_stations:any = [];
+  //Intermediate station data
+  #station_objects: station_object[] = [];
+  #optimal_stations: station_object[] = [];
   #final_route:any = [];
+
+  //Google Services
+  #places_service!: google.maps.places.PlacesService;
+  #directions_service!: google.maps.DirectionsService;
+  #directions_render_service!: google.maps.DirectionsRenderer;
+  #distance_matrix_service!: google.maps.DistanceMatrixService;
   
   constructor() 
   { 
@@ -51,61 +57,98 @@ export class RoutingAlgorithmService {
     this.#destination_ready = false;
   }
 
-  selectStation()
+
+  renderRoute()
   {
-    let num_stations = this.#station_objects.length;
-    let chosen_index = 0;
+    console.log(this.#optimal_stations);
+  }
+
+
+  isUniqueStation(chosen_station: station_object)
+  {
+    //Check if the chosen_station is in the optimal_stations array.
+    let num_stations = this.#optimal_stations.length;
 
     for(let i=0; i<num_stations; i++)
     {
+      if(chosen_station.place_id === this.#optimal_stations[i].place_id)
+      {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+
+  selectStation()
+  {
+    //Step 1: Extract the stations that are (within current_range) and (are unique).
+    let num_stations = this.#station_objects.length;
+    let valid_stations: station_object[] = [];
+    for(let i=0; i<num_stations; i++)
+    {
       let current_station = this.#station_objects[i];
-      //The chosen station must be within current_range and have the shortest distance to the destination.
       if(current_station.distance_to_origin < this.#current_vehicle_range &&
-         current_station.distance_to_destination <= this.#station_objects[chosen_index].distance_to_destination)
+         this.isUniqueStation(current_station))
+      {
+        valid_stations.push(current_station);
+      }
+    }
+
+    //Edge Case #1: None of the stations are 'valid' thus no route possible.
+    let num_valid_stations = valid_stations.length;
+    if(num_valid_stations == 0)
+    {
+      alert("No Route 1: There are insufficient stations within your current range.");
+      return null;
+    }
+
+    //Step 2: From the valid stations, select the station with min(distance_to_destination).
+    let chosen_index = 0;
+    for(let i=1; i<num_valid_stations; i++)
+    {
+      let current_station = valid_stations[i];
+      if(current_station.distance_to_destination < valid_stations[chosen_index].distance_to_destination)
       {
         chosen_index = i;
       }
     }
-
-    //Edge Case #1: None of the stations satisfy the conditions thus no route possible.
-    if(chosen_index == 0 &&
-       this.#station_objects[chosen_index].distance_to_origin >= this.#current_vehicle_range)
-    {
-      alert("No Route 1: There are insufficient stations within your current_range.");
-      return -1;
-    }
-
-    return chosen_index;
+    
+    return valid_stations[chosen_index];
   }
 
 
   constructRoute(origin_coords: google.maps.LatLng,
-                 destination_coords: google.maps.LatLng,
-                 places_service: google.maps.places.PlacesService,
-                 directions_service: google.maps.DirectionsService,
-                 directions_render_service: google.maps.DirectionsRenderer,
-                 distance_matrix_service: google.maps.DistanceMatrixService)
+                 destination_coords: google.maps.LatLng)
   {
-
     //Step 1: Make a greedy station selection based on distance.
-    let chosen_index: number = this.selectStation();
-    if(chosen_index == -1)
+    let chosen_station: station_object|null = this.selectStation();
+    if(chosen_station == null)
     {
-        return;
+      return;
     }
 
-    //Step 2: Ensure that the chosen station is unique in your optimal_stations.
-    
-
+    //Step 2: Append the chosen station to the optimal stations array.
+    this.#optimal_stations.push(chosen_station);
+      
+    //Step 3: Determine whether you need additional stations.
+    if(chosen_station.distance_to_destination >= this.#current_vehicle_range)
+    {
+      //We need to add additional stations.
+      this.findStation(chosen_station.geometry, 
+                       destination_coords);
+    }
+    else
+    {
+      //The route is complete, we can render it on the map. 
+      this.renderRoute();
+    } 
   }
 
 
   getDistanceMatrix(origin_coords: google.maps.LatLng,
-                    destination_coords: google.maps.LatLng,
-                    places_service: google.maps.places.PlacesService,
-                    directions_service: google.maps.DirectionsService,
-                    directions_render_service: google.maps.DirectionsRenderer,
-                    distance_matrix_service: google.maps.DistanceMatrixService)
+                    destination_coords: google.maps.LatLng)
   {
     //Create a copy of the station_objects array that only contains station coordinates.
     let way_points = [];
@@ -120,7 +163,7 @@ export class RoutingAlgorithmService {
       travelMode: 'DRIVING'
     };
 
-    distance_matrix_service.getDistanceMatrix(distanceMatrix_request, (results, status) => {
+    this.#distance_matrix_service.getDistanceMatrix(distanceMatrix_request, (results, status) => {
 
       if(status == google.maps.DistanceMatrixStatus.OK && results != null)
       {
@@ -137,30 +180,18 @@ export class RoutingAlgorithmService {
 
         //Construct the route by selecting the optimal stations.
         this.constructRoute(origin_coords,
-                            destination_coords,
-                            places_service,
-                            directions_service,
-                            directions_render_service,
-                            distance_matrix_service);
+                            destination_coords);
       }
       else
       {
         alert("Error 4: Couldn't compute distance matrix for specified stations.");
       }
-
     });
-
-
-
   }
 
 
   findStation(origin_coords: google.maps.LatLng,
-              destination_coords: google.maps.LatLng,
-              places_service: google.maps.places.PlacesService,
-              directions_service: google.maps.DirectionsService,
-              directions_render_service: google.maps.DirectionsRenderer,
-              distance_matrix_service: google.maps.DistanceMatrixService)
+              destination_coords: google.maps.LatLng)
   {
     //Search for charging/gas stations within a current_range radius of the origin.
     let search_request = {
@@ -170,7 +201,7 @@ export class RoutingAlgorithmService {
     };
 
     //Returns an array of all matches within the radius.
-    places_service.textSearch(search_request, (results, status) => {
+    this.#places_service.textSearch(search_request, (results, status) => {
       
       if(status == google.maps.places.PlacesServiceStatus.OK && results != null)
       {
@@ -193,11 +224,7 @@ export class RoutingAlgorithmService {
         }
 
         this.getDistanceMatrix(origin_coords,
-                               destination_coords,
-                               places_service,
-                               directions_service,
-                               directions_render_service,
-                               distance_matrix_service);
+                               destination_coords);
       }
       else
       {
@@ -214,11 +241,7 @@ export class RoutingAlgorithmService {
 
 
   computeDistance(origin_coords: google.maps.LatLng,
-                  destination_coords: google.maps.LatLng,
-                  places_service: google.maps.places.PlacesService,
-                  directions_service: google.maps.DirectionsService,
-                  directions_render_service: google.maps.DirectionsRenderer,
-                  distance_matrix_service: google.maps.DistanceMatrixService)
+                  destination_coords: google.maps.LatLng)
   {
     let directions_request: any = {
       origin: origin_coords,
@@ -227,7 +250,7 @@ export class RoutingAlgorithmService {
       travelMode: 'DRIVING'
     };
 
-    directions_service.route(directions_request, (results, status) =>{
+    this.#directions_service.route(directions_request, (results, status) =>{
       
       if(status == google.maps.DirectionsStatus.OK && results != null)
       { 
@@ -243,16 +266,12 @@ export class RoutingAlgorithmService {
         {
           //Recursively append charging/gas stations until destination is within current_range.
           this.findStation(origin_coords,
-                           destination_coords, 
-                           places_service,
-                           directions_service,
-                           directions_render_service,
-                           distance_matrix_service);
+                           destination_coords);
         }
         else
         {
           //Render the direct route.
-
+          this.renderRoute();
         }
       }
       else
@@ -263,10 +282,7 @@ export class RoutingAlgorithmService {
   }
 
 
-  waitForPlaces(places_service: google.maps.places.PlacesService,
-                directions_service: google.maps.DirectionsService,
-                directions_render_service: google.maps.DirectionsRenderer,
-                distance_matrix_service: google.maps.DistanceMatrixService)
+  waitForPlaces()
   {
     if(this.#origin_ready && this.#destination_ready)
     {
@@ -282,29 +298,24 @@ export class RoutingAlgorithmService {
       else
       {
         this.computeDistance(this.#origin_data.geometry.location, 
-                             this.#destination_data.geometry.location,
-                             places_service,
-                             directions_service,
-                             directions_render_service,
-                             distance_matrix_service);
+                             this.#destination_data.geometry.location);
       }
     }
     else
     {
-      setTimeout(()=>{this.waitForPlaces(places_service, directions_service, directions_render_service, distance_matrix_service);}, 100);
+      setTimeout(()=>{this.waitForPlaces();}, 100);
     }
   }
 
 
-  getPlacesData(data: journey_data, 
-                places_service: google.maps.places.PlacesService)
+  getPlacesData(data: journey_data)
   {
     //You can get photos as fields.
     let origin_request = {
       query: data.origin_string,
       fields: ['name','geometry']
     }
-    places_service.findPlaceFromQuery(origin_request, (results, status)=>{
+    this.#places_service.findPlaceFromQuery(origin_request, (results, status)=>{
 
       if(status == google.maps.places.PlacesServiceStatus.OK && results != null)
       {
@@ -322,7 +333,7 @@ export class RoutingAlgorithmService {
       query: data.destination_string,
       fields: ['name','geometry']
     }
-    places_service.findPlaceFromQuery(destination_request, (results, status)=>{
+    this.#places_service.findPlaceFromQuery(destination_request, (results, status)=>{
 
       if(status == google.maps.places.PlacesServiceStatus.OK && results != null)
       {
@@ -335,7 +346,6 @@ export class RoutingAlgorithmService {
       }
       this.#destination_ready = true;
     });
-
   }
 
 
@@ -346,14 +356,24 @@ export class RoutingAlgorithmService {
                    directions_render_service: google.maps.DirectionsRenderer,
                    distance_matrix_service: google.maps.DistanceMatrixService)
   {
-    //Step #1: Use the places API to find the location corresponding to the input strings.
-    this.getPlacesData(data, places_service);
+    //Clear out intermediate station data.
+    this.#station_objects = [];
+    this.#optimal_stations = [];
+    this.#final_route = [];
     
+    //Update member variables with received parameters.
     this.#max_vehicle_range = (parseInt(data.range_string)*1000);
     this.#current_vehicle_range = this.#max_vehicle_range;
     this.#fuel_type = fuel_type;
-    this.waitForPlaces(places_service, directions_service, directions_render_service, distance_matrix_service);
+    this.#places_service = places_service;
+    this.#directions_service = directions_service;
+    this.#directions_render_service = directions_render_service;
+    this.#distance_matrix_service = distance_matrix_service;
 
+    //Step #1: Use the places API to find the location corresponding to the input strings.
+    this.getPlacesData(data);
+    
+    this.waitForPlaces();
   }
 
 }
