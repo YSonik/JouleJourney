@@ -24,6 +24,8 @@ type station_object = {
 export class RoutingAlgorithmService {
 
   //Member Variables
+  static max_depth = 5;
+  #current_depth:number = 0;
   #origin_data!: any;
   #origin_ready: boolean;
 
@@ -193,6 +195,14 @@ export class RoutingAlgorithmService {
   findStation(origin_coords: google.maps.LatLng,
               destination_coords: google.maps.LatLng)
   {
+    //Check for max recursion depth.
+    if(this.#current_depth >= RoutingAlgorithmService.max_depth)
+    {
+      alert("Warning: Maximum recursion depth reached, please enter a shorter trip.");
+      return;
+    }
+    this.#current_depth+=1;
+    
     //Search for charging/gas stations within a current_range radius of the origin.
     let search_request = {
       location: origin_coords,
@@ -360,6 +370,7 @@ export class RoutingAlgorithmService {
     this.#station_objects = [];
     this.#optimal_stations = [];
     this.#final_route = [];
+    this.#current_depth = 0;
     
     //Update member variables with received parameters.
     this.#max_vehicle_range = (parseInt(data.range_string)*1000);

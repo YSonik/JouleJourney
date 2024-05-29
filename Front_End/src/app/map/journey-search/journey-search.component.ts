@@ -66,9 +66,9 @@ export class JourneySearchComponent implements OnInit{
 
     //Input Validation
     let range_input = parseInt(data.range_string);
-    if(range_input < 50 || range_input > 1000)
+    if(range_input < 100 || range_input > 1000)
     {
-      alert("Please enter a valid vehicle range between 50 and 1000 KM.");
+      alert("Please enter a valid vehicle range between 100 and 1000 KM.");
       return;
     }
 
