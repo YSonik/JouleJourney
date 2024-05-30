@@ -63,7 +63,7 @@ export class MapComponent implements OnInit {
     this.#directions_render_service.setOptions({suppressMarkers: true});
     
     this.#custom_icons = new Map([
-      ["origin", {url: "../../assets/origin.png", scaledSize: new google.maps.Size(70,70)}],
+      ["origin", {url: "../../assets/origin.png", scaledSize: new google.maps.Size(100,80)}],
       ["destination", {url: "../../assets/destination.png",scaledSize: new google.maps.Size(70,70)}],
       ["electricity", {url: "../../assets/chargingStation.png", scaledSize: new google.maps.Size(50,50)}],
       ["gasoline", {url: "../../assets/gasStation.png", scaledSize: new google.maps.Size(70,70)}]

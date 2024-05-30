@@ -118,16 +118,23 @@ export class RoutingAlgorithmService {
     let sparse_stations: station_object[] = []
     let current_station = 0;
     let travelled_value = 0;
-
+    
     if(num_stations >= 2)
     {
       while(current_station<num_stations)
       {
         //Edge Case: the last station is too far from the destination.
-        if(current_station == (num_stations-1) && 
-           sparse_stations[sparse_stations.length-1].distance_to_destination > this.#current_vehicle_range)
+        if(current_station == (num_stations-1))
         {
-          sparse_stations.push(optimal_stations[current_station]);
+          if(sparse_stations.length == 0)
+          {
+            sparse_stations.push(optimal_stations[current_station]);
+          }
+          else if(sparse_stations[sparse_stations.length-1].distance_to_destination > this.#current_vehicle_range)
+          {
+            sparse_stations.push(optimal_stations[current_station]);
+          }
+          current_station+=1; 
         }
         else if(optimal_stations[current_station].distance_to_origin < (this.#current_vehicle_range+travelled_value))
         {
@@ -336,7 +343,7 @@ export class RoutingAlgorithmService {
     //Check for max recursion depth.
     if(recursion_depth >= RoutingAlgorithmService.max_depth)
     {
-      alert("Warning: Maximum recursion depth reached, please enter a shorter trip.");
+      alert("Warning: Maximum recursion depth reached, please enter a shorter trip or increase vehicle range.");
       return;
     }
     recursion_depth+=1;
