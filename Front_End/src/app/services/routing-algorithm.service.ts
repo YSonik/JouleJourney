@@ -12,10 +12,9 @@ type station_object = {
   rating: any;
   address: any;
   geometry: any;
-  distance_to_origin: any;
-  time_to_origin: any;
-  distance_to_destination: any;
-  time_to_destination: any;
+  distance_to_origin: any; //Origin
+  distance_to_moving_origin: any; //Previous station
+  distance_to_destination: any; //Destination
 };
 
 @Injectable({
@@ -24,7 +23,7 @@ type station_object = {
 export class RoutingAlgorithmService {
 
   //Member Variables
-  static max_depth = 5;
+  static max_depth = 20;
   #origin_data!: any;
   #origin_ready: boolean;
 
@@ -53,10 +52,78 @@ export class RoutingAlgorithmService {
     this.#destination_ready = false;
   }
 
+  sparseStations(optimal_stations: station_object[])
+  {
+    let num_stations = optimal_stations.length;
+    let sparse_stations: station_object[] = []
+    let current_station = 0;
+    let travelled_value = 0;
+
+    if(num_stations >= 2)
+    {
+      while(current_station<num_stations)
+      {
+        //Edge Case: the last station is too far from the destination.
+        if(current_station == (num_stations-1) && 
+           sparse_stations[sparse_stations.length-1].distance_to_destination > this.#current_vehicle_range)
+        {
+          sparse_stations.push(optimal_stations[current_station]);
+        }
+        else if(optimal_stations[current_station].distance_to_origin < (this.#current_vehicle_range+travelled_value))
+        {
+          current_station+=1;
+        }
+        else
+        {
+          let chosen_station = optimal_stations[current_station-1];
+          sparse_stations.push(chosen_station);
+          travelled_value = (chosen_station.distance_to_origin);
+        }
+      }
+      return sparse_stations; 
+    }
+    else
+    {
+      return optimal_stations;
+    }
+  }
 
   renderRoute(optimal_stations: station_object[])
   {
-    console.log(optimal_stations);
+    //Step 1: Omit any 'densely' spaced stations.
+    let sparse_stations: station_object[] = this.sparseStations(optimal_stations);
+    
+    //Step 2: Create a waypoints array using the optimal stations.
+    let way_points = [];
+    for(let i=0; i<sparse_stations.length; i++)
+    {
+      way_points.push({
+        location: sparse_stations[i].geometry,
+        stopover: true
+      });
+    } 
+    
+    //Step 3: Create a directions request that include the origin, stations and destination.
+    let directions_request: any = {
+      origin: this.#origin_data.geometry.location,
+      destination: this.#destination_data.geometry.location,
+      waypoints: way_points,
+      travelMode: 'DRIVING',
+      provideRouteAlternatives: false
+    };
+
+    //Step 4: Use the directions service to compute the final route and render the results.
+    this.#directions_service.route(directions_request, (results, status) => {
+      if(status == google.maps.DirectionsStatus.OK && results != null)
+      {
+        this.#directions_render_service.setDirections(results);
+      }
+      else
+      { 
+        alert("Error 5: Couldn't compute the final route.")
+        return;
+      }
+    });
   }
 
 
@@ -85,7 +152,7 @@ export class RoutingAlgorithmService {
     for(let i=0; i<num_stations; i++)
     {
       let current_station = station_objects[i];
-      if(current_station.distance_to_origin < this.#current_vehicle_range &&
+      if(current_station.distance_to_moving_origin < this.#current_vehicle_range &&
          this.isUniqueStation(current_station, optimal_stations) &&
          current_station.distance_to_destination < this.#journey_distance)
       {
@@ -131,7 +198,7 @@ export class RoutingAlgorithmService {
 
     //Step 2: Append the chosen station to the optimal stations array.
     optimal_stations.push(chosen_station);
-    
+
     //Step 3: Determine whether you need additional stations.
     if(chosen_station.distance_to_destination >= this.#current_vehicle_range)
     {
@@ -163,7 +230,8 @@ export class RoutingAlgorithmService {
     }
 
     let distanceMatrix_request: any = {
-      origins: [origin_coords, destination_coords],
+              //Origin,                           Previous Station  Destination
+      origins: [this.#origin_data.geometry.location, origin_coords, destination_coords],
       destinations: way_points,
       travelMode: 'DRIVING'
     };
@@ -177,10 +245,8 @@ export class RoutingAlgorithmService {
         {
           let current_station = station_objects[i];
           current_station.distance_to_origin = results.rows[0].elements[i].distance.value;
-          current_station.time_to_origin = results.rows[0].elements[i].duration.value;
-          
-          current_station.distance_to_destination = results.rows[1].elements[i].distance.value;
-          current_station.time_to_destination = results.rows[1].elements[i].duration.value;
+          current_station.distance_to_moving_origin = results.rows[1].elements[i].distance.value;
+          current_station.distance_to_destination = results.rows[2].elements[i].distance.value;
         }
 
         //Construct the route by selecting the optimal stations.
@@ -212,6 +278,7 @@ export class RoutingAlgorithmService {
     recursion_depth+=1;
     
     //Search for charging/gas stations within a current_range radius of the origin.
+    //**TextSearch is upperbounding the radius at 50000meters.(Need to optimize)
     let search_request = {
       location: origin_coords,
       query: this.#fuel_queries.get(this.#fuel_type),
@@ -234,9 +301,8 @@ export class RoutingAlgorithmService {
             address: results[i].formatted_address,
             geometry: results[i].geometry?.location,
             distance_to_origin: 0,
-            time_to_origin: 0,
-            distance_to_destination: 0,
-            time_to_destination: 0
+            distance_to_moving_origin: 0,
+            distance_to_destination: 0
           }
           station_objects.push(current_station);
         }
