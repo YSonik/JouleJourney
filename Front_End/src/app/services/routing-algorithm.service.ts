@@ -25,7 +25,6 @@ export class RoutingAlgorithmService {
 
   //Member Variables
   static max_depth = 5;
-  #current_depth:number = 0;
   #origin_data!: any;
   #origin_ready: boolean;
 
@@ -38,15 +37,10 @@ export class RoutingAlgorithmService {
   
   #fuel_type = "electricity";
   #fuel_queries = new Map([
-    ["electricity", 'Electric vehicle charging station'],
-    ["gasoline", 'Gas station']
+    ["electricity", 'electric vehicle charging station'],
+    ["gasoline", 'gasoline']
   ]);
   
-  //Intermediate station data
-  #station_objects: station_object[] = [];
-  #optimal_stations: station_object[] = [];
-  #final_route:any = [];
-
   //Google Services
   #places_service!: google.maps.places.PlacesService;
   #directions_service!: google.maps.DirectionsService;
@@ -60,20 +54,20 @@ export class RoutingAlgorithmService {
   }
 
 
-  renderRoute()
+  renderRoute(optimal_stations: station_object[])
   {
-    console.log(this.#optimal_stations);
+    console.log(optimal_stations);
   }
 
 
-  isUniqueStation(chosen_station: station_object)
+  isUniqueStation(chosen_station: station_object, optimal_stations: station_object[])
   {
     //Check if the chosen_station is in the optimal_stations array.
-    let num_stations = this.#optimal_stations.length;
+    let num_stations = optimal_stations.length;
 
     for(let i=0; i<num_stations; i++)
     {
-      if(chosen_station.place_id === this.#optimal_stations[i].place_id)
+      if(chosen_station.place_id === optimal_stations[i].place_id)
       {
         return false;
       }
@@ -83,16 +77,17 @@ export class RoutingAlgorithmService {
   }
 
 
-  selectStation()
+  selectStation(station_objects: station_object[], optimal_stations: station_object[])
   {
     //Step 1: Extract the stations that are (within current_range) and (are unique).
-    let num_stations = this.#station_objects.length;
+    let num_stations = station_objects.length;
     let valid_stations: station_object[] = [];
     for(let i=0; i<num_stations; i++)
     {
-      let current_station = this.#station_objects[i];
+      let current_station = station_objects[i];
       if(current_station.distance_to_origin < this.#current_vehicle_range &&
-         this.isUniqueStation(current_station))
+         this.isUniqueStation(current_station, optimal_stations) &&
+         current_station.distance_to_destination < this.#journey_distance)
       {
         valid_stations.push(current_station);
       }
@@ -108,7 +103,7 @@ export class RoutingAlgorithmService {
 
     //Step 2: From the valid stations, select the station with min(distance_to_destination).
     let chosen_index = 0;
-    for(let i=1; i<num_valid_stations; i++)
+    for(let i=0; i<num_valid_stations; i++)
     {
       let current_station = valid_stations[i];
       if(current_station.distance_to_destination < valid_stations[chosen_index].distance_to_destination)
@@ -122,41 +117,49 @@ export class RoutingAlgorithmService {
 
 
   constructRoute(origin_coords: google.maps.LatLng,
-                 destination_coords: google.maps.LatLng)
+                 destination_coords: google.maps.LatLng,
+                 station_objects: station_object[],
+                 optimal_stations: station_object[],
+                 recursion_depth: number)
   {
     //Step 1: Make a greedy station selection based on distance.
-    let chosen_station: station_object|null = this.selectStation();
+    let chosen_station: station_object|null = this.selectStation(station_objects, optimal_stations);
     if(chosen_station == null)
     {
       return;
     }
 
     //Step 2: Append the chosen station to the optimal stations array.
-    this.#optimal_stations.push(chosen_station);
-      
+    optimal_stations.push(chosen_station);
+    
     //Step 3: Determine whether you need additional stations.
     if(chosen_station.distance_to_destination >= this.#current_vehicle_range)
     {
       //We need to add additional stations.
       this.findStation(chosen_station.geometry, 
-                       destination_coords);
+                       destination_coords,
+                       optimal_stations, 
+                       recursion_depth);
     }
     else
     {
       //The route is complete, we can render it on the map. 
-      this.renderRoute();
+      this.renderRoute(optimal_stations);
     } 
   }
 
 
   getDistanceMatrix(origin_coords: google.maps.LatLng,
-                    destination_coords: google.maps.LatLng)
+                    destination_coords: google.maps.LatLng,
+                    station_objects: station_object[],
+                    optimal_stations: station_object[],
+                    recursion_depth: number)
   {
     //Create a copy of the station_objects array that only contains station coordinates.
     let way_points = [];
-    for(let i=0; i<this.#station_objects.length; i++)
+    for(let i=0; i<station_objects.length; i++)
     {
-      way_points.push(this.#station_objects[i].geometry);
+      way_points.push(station_objects[i].geometry);
     }
 
     let distanceMatrix_request: any = {
@@ -170,9 +173,9 @@ export class RoutingAlgorithmService {
       if(status == google.maps.DistanceMatrixStatus.OK && results != null)
       {
         //Extract the distance/time to origin and distance/time to destination for each station.
-        for(let i=0; i<this.#station_objects.length; i++)
+        for(let i=0; i<station_objects.length; i++)
         {
-          let current_station = this.#station_objects[i];
+          let current_station = station_objects[i];
           current_station.distance_to_origin = results.rows[0].elements[i].distance.value;
           current_station.time_to_origin = results.rows[0].elements[i].duration.value;
           
@@ -182,7 +185,10 @@ export class RoutingAlgorithmService {
 
         //Construct the route by selecting the optimal stations.
         this.constructRoute(origin_coords,
-                            destination_coords);
+                            destination_coords,
+                            station_objects,
+                            optimal_stations,
+                            recursion_depth);
       }
       else
       {
@@ -193,15 +199,17 @@ export class RoutingAlgorithmService {
 
 
   findStation(origin_coords: google.maps.LatLng,
-              destination_coords: google.maps.LatLng)
+              destination_coords: google.maps.LatLng,
+              optimal_stations: station_object[],
+              recursion_depth: number)
   {
     //Check for max recursion depth.
-    if(this.#current_depth >= RoutingAlgorithmService.max_depth)
+    if(recursion_depth >= RoutingAlgorithmService.max_depth)
     {
       alert("Warning: Maximum recursion depth reached, please enter a shorter trip.");
       return;
     }
-    this.#current_depth+=1;
+    recursion_depth+=1;
     
     //Search for charging/gas stations within a current_range radius of the origin.
     let search_request = {
@@ -216,7 +224,7 @@ export class RoutingAlgorithmService {
       if(status == google.maps.places.PlacesServiceStatus.OK && results != null)
       {
         let num_chargers = results.length;
-        this.#station_objects = [];
+        let station_objects = [];
 
         for (let i=0; i<num_chargers; i++) {
           let current_station: station_object = {
@@ -230,11 +238,14 @@ export class RoutingAlgorithmService {
             distance_to_destination: 0,
             time_to_destination: 0
           }
-          this.#station_objects.push(current_station);
+          station_objects.push(current_station);
         }
-
+        
         this.getDistanceMatrix(origin_coords,
-                               destination_coords);
+                               destination_coords,
+                               station_objects,
+                               optimal_stations,
+                               recursion_depth);
       }
       else
       {
@@ -251,7 +262,9 @@ export class RoutingAlgorithmService {
 
 
   computeDistance(origin_coords: google.maps.LatLng,
-                  destination_coords: google.maps.LatLng)
+                  destination_coords: google.maps.LatLng,
+                  optimal_stations: station_object[], 
+                  recursion_depth: number)
   {
     let directions_request: any = {
       origin: origin_coords,
@@ -276,12 +289,14 @@ export class RoutingAlgorithmService {
         {
           //Recursively append charging/gas stations until destination is within current_range.
           this.findStation(origin_coords,
-                           destination_coords);
+                           destination_coords,
+                           optimal_stations,
+                           recursion_depth);
         }
         else
         {
           //Render the direct route.
-          this.renderRoute();
+          this.renderRoute(optimal_stations);
         }
       }
       else
@@ -292,7 +307,7 @@ export class RoutingAlgorithmService {
   }
 
 
-  waitForPlaces()
+  waitForPlaces(optimal_stations: station_object[], recursion_depth: number)
   {
     if(this.#origin_ready && this.#destination_ready)
     {
@@ -308,12 +323,14 @@ export class RoutingAlgorithmService {
       else
       {
         this.computeDistance(this.#origin_data.geometry.location, 
-                             this.#destination_data.geometry.location);
+                             this.#destination_data.geometry.location,
+                             optimal_stations,
+                             recursion_depth);
       }
     }
     else
     {
-      setTimeout(()=>{this.waitForPlaces();}, 100);
+      setTimeout(()=>{this.waitForPlaces(optimal_stations, recursion_depth);}, 100);
     }
   }
 
@@ -365,13 +382,7 @@ export class RoutingAlgorithmService {
                    directions_service: google.maps.DirectionsService,
                    directions_render_service: google.maps.DirectionsRenderer,
                    distance_matrix_service: google.maps.DistanceMatrixService)
-  {
-    //Clear out intermediate station data.
-    this.#station_objects = [];
-    this.#optimal_stations = [];
-    this.#final_route = [];
-    this.#current_depth = 0;
-    
+  { 
     //Update member variables with received parameters.
     this.#max_vehicle_range = (parseInt(data.range_string)*1000);
     this.#current_vehicle_range = this.#max_vehicle_range;
@@ -383,8 +394,10 @@ export class RoutingAlgorithmService {
 
     //Step #1: Use the places API to find the location corresponding to the input strings.
     this.getPlacesData(data);
-    
-    this.waitForPlaces();
+    //Station Data
+    let optimal_stations: station_object[] = [];
+    let recursion_depth: number = 0;
+    this.waitForPlaces(optimal_stations, recursion_depth);
   }
 
 }
