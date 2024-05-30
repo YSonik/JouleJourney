@@ -41,16 +41,76 @@ export class RoutingAlgorithmService {
   ]);
   
   //Google Services
+  #map_object!: google.maps.Map;
   #places_service!: google.maps.places.PlacesService;
   #directions_service!: google.maps.DirectionsService;
   #directions_render_service!: google.maps.DirectionsRenderer;
   #distance_matrix_service!: google.maps.DistanceMatrixService;
+
+  //Custom markers
+  #custom_icons !: any;
+  #custom_markers: google.maps.Marker[] = [];
+  #info_window!: google.maps.InfoWindow; 
   
   constructor() 
   { 
     this.#origin_ready = false;
     this.#destination_ready = false;
   }
+
+
+  clearCustomMarkers()
+  {
+    this.#custom_markers.forEach((marker)=>{
+      marker.setMap(null);
+    });
+  }
+
+
+  createCustomMarkers(sparse_stations: station_object[])
+  {
+    //Origin
+    let origin_marker = new google.maps.Marker({
+      position: this.#origin_data.geometry.location,
+      map: this.#map_object,
+      icon: this.#custom_icons.get("origin"),
+      title: `${this.#origin_data.name}|${this.#origin_data.address}`
+    });
+    this.#custom_markers.push(origin_marker);
+
+    //Destination
+    let destination_marker = new google.maps.Marker({
+      position: this.#destination_data.geometry.location,
+      map: this.#map_object,
+      icon: this.#custom_icons.get("destination"),
+      title: `${this.#destination_data.name}|${this.#destination_data.address}`
+    });
+    this.#custom_markers.push(destination_marker);
+
+    //Stations
+    sparse_stations.forEach((station)=>{
+      let station_marker = new google.maps.Marker(
+        {
+          position: station.geometry,
+          map: this.#map_object,
+          icon: this.#custom_icons.get(this.#fuel_type),
+          title: `${station.name}|${station.address}`
+        }
+      );
+      this.#custom_markers.push(station_marker);
+    });
+
+    //Display an infoWindow when a marker is clicked.
+    this.#custom_markers.forEach((marker)=>{
+      let marker_title:any = marker.getTitle();
+      let marker_attributes = marker_title.split("|");
+      marker.addListener('click', ()=>{
+        this.#info_window.setContent(`<p>Name: ${marker_attributes[0]}<br>Address: ${marker_attributes[1]}</p>`);
+        this.#info_window.open(this.#map_object, marker);
+      });
+    });
+  }
+
 
   sparseStations(optimal_stations: station_object[])
   {
@@ -88,12 +148,13 @@ export class RoutingAlgorithmService {
     }
   }
 
+
   renderRoute(optimal_stations: station_object[])
   {
     //Step 1: Omit any 'densely' spaced stations.
     let sparse_stations: station_object[] = this.sparseStations(optimal_stations);
     
-    //Step 2: Create a waypoints array using the optimal stations.
+    //Step 2: Create a waypoints array using the sparse stations.
     let way_points = [];
     for(let i=0; i<sparse_stations.length; i++)
     {
@@ -117,6 +178,9 @@ export class RoutingAlgorithmService {
       if(status == google.maps.DirectionsStatus.OK && results != null)
       {
         this.#directions_render_service.setDirections(results);
+
+        //Use the custom markers to display the route.
+        this.createCustomMarkers(sparse_stations);
       }
       else
       { 
@@ -346,7 +410,11 @@ export class RoutingAlgorithmService {
         //Extract the journey distance from the result.
         this.#journey_distance = results.routes[0].legs[0].distance?.value;
         let start_address = results.routes[0].legs[0].start_address;
+        this.#origin_data["address"] = start_address;
+
         let stop_address = results.routes[0].legs[0].end_address;
+        this.#destination_data["address"] = stop_address;
+
         console.log(`The distance from ${start_address} to ${stop_address} is ${this.#journey_distance} meters.\n`);
         console.log(`Your vehicle's current range is ${this.#current_vehicle_range} meters.\n`);
 
@@ -443,16 +511,25 @@ export class RoutingAlgorithmService {
 
 
   constructJourney(data: journey_data,
-                   fuel_type: string, 
+                   fuel_type: string,
+                   map_object: google.maps.Map,
+                   custom_icons: any,
+                   info_window: google.maps.InfoWindow,  
                    places_service: google.maps.places.PlacesService,
+                   distance_matrix_service: google.maps.DistanceMatrixService,
                    directions_service: google.maps.DirectionsService,
-                   directions_render_service: google.maps.DirectionsRenderer,
-                   distance_matrix_service: google.maps.DistanceMatrixService)
+                   directions_render_service: google.maps.DirectionsRenderer)
   { 
+    //Clear the custom markers.
+    this.clearCustomMarkers();
+
     //Update member variables with received parameters.
     this.#max_vehicle_range = (parseInt(data.range_string)*1000);
     this.#current_vehicle_range = this.#max_vehicle_range;
     this.#fuel_type = fuel_type;
+    this.#map_object = map_object;
+    this.#custom_icons = custom_icons;
+    this.#info_window = info_window;
     this.#places_service = places_service;
     this.#directions_service = directions_service;
     this.#directions_render_service = directions_render_service;

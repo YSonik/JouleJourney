@@ -26,9 +26,11 @@ export class MapComponent implements OnInit {
   #map_element!: any;
   #map_object!: google.maps.Map;
   #places_service!: google.maps.places.PlacesService;
+  #distance_matrix_service!: google.maps.DistanceMatrixService;
   #directions_service!: google.maps.DirectionsService;
   #directions_render_service!: google.maps.DirectionsRenderer;
-  #distance_matrix_service!: google.maps.DistanceMatrixService;
+  #custom_icons!: any;
+  #info_window!: google.maps.InfoWindow; 
   #fuel_type: string = "electricity";
 
   
@@ -49,16 +51,26 @@ export class MapComponent implements OnInit {
     //Instantiate the places_service.
     this.#places_service = new google.maps.places.PlacesService(this.#map_object);
 
+    //Instantiate the distance_matrix_service.
+    this.#distance_matrix_service = new google.maps.DistanceMatrixService();
+
     //Instantiate the directions_service.
     this.#directions_service = new google.maps.DirectionsService();
 
     //Instantiate the directions_render_service.
     this.#directions_render_service = new google.maps.DirectionsRenderer();
     this.#directions_render_service.setMap(this.#map_object);
+    this.#directions_render_service.setOptions({suppressMarkers: true});
+    
+    this.#custom_icons = new Map([
+      ["origin", {url: "../../assets/origin.png", scaledSize: new google.maps.Size(70,70)}],
+      ["destination", {url: "../../assets/destination.png",scaledSize: new google.maps.Size(70,70)}],
+      ["electricity", {url: "../../assets/chargingStation.png", scaledSize: new google.maps.Size(50,50)}],
+      ["gasoline", {url: "../../assets/gasStation.png", scaledSize: new google.maps.Size(70,70)}]
+    ]);
 
-    //Instantiate the distance_matrix_service.
-    this.#distance_matrix_service = new google.maps.DistanceMatrixService();
-
+    //Instantiate the InfoWindow class.
+    this.#info_window = new google.maps.InfoWindow();
   }
 
   #loadScript()
@@ -75,7 +87,7 @@ export class MapComponent implements OnInit {
   {
     //Load the google maps libraries.
     this.#map_api_key = this.googleMapsService.getApiKey();
-    //this.#loadScript();
+    this.#loadScript();
   }
 
   constructor(private googleMapsService: GoogleMapsService, private routingAlgorithmService: RoutingAlgorithmService)
@@ -85,7 +97,7 @@ export class MapComponent implements OnInit {
 
   createJourney(data: journey_data)
   {
-    this.routingAlgorithmService.constructJourney(data, this.#fuel_type, this.#places_service, this.#directions_service, this.#directions_render_service, this.#distance_matrix_service);
+    this.routingAlgorithmService.constructJourney(data, this.#fuel_type, this.#map_object, this.#custom_icons, this.#info_window, this.#places_service, this.#distance_matrix_service, this.#directions_service, this.#directions_render_service);
   }
 
   changeFuel(data: fuel_data)
