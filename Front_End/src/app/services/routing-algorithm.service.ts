@@ -213,7 +213,7 @@ export class RoutingAlgorithmService {
     let optimal_stations: station_object[] = []
     let current_station = 0;
     let travelled_value = 0;
-    
+
     if(num_stations >= 2)
     {
       while(current_station<num_stations)
@@ -231,20 +231,26 @@ export class RoutingAlgorithmService {
           }
           current_station+=1; 
         }
-        else if(station_objects[current_station].distance_to_origin < (this.#current_vehicle_range+travelled_value))
+        else if(station_objects[current_station].distance_to_origin < ((this.#current_vehicle_range*0.5) + travelled_value))
         {
           current_station+=1;
         }
         else
         {
           //Edge Case: No route possible due to insufficient stations.
-          if(current_station == 0)
+          if(current_station == 0 &&
+             station_objects[current_station].distance_to_origin > (this.#current_vehicle_range + travelled_value)
+          )
           {
             return null;
           }
-          let chosen_station = station_objects[current_station-1];
-          optimal_stations.push(chosen_station);
-          travelled_value = (chosen_station.distance_to_origin);
+          else
+          {
+            let chosen_station = station_objects[current_station];
+            optimal_stations.push(chosen_station);
+            travelled_value = (chosen_station.distance_to_origin);
+            current_station+=1;
+          }
         }
       }
 
@@ -280,6 +286,10 @@ export class RoutingAlgorithmService {
     
     //Step 2: Make a greedy station selection based on distance_to_origin.
     let optimal_stations: station_object[]|null = this.optimalStations(station_objects);
+
+    //Need to perform sparseStation extraction.(And ensure no distance between chargers is greater than current_vehicle_range).
+
+
     if(optimal_stations == null)
     {
       alert("No Route 1: No route possible due to insufficient stations. Try extending the vehicle range.");
@@ -333,17 +343,34 @@ export class RoutingAlgorithmService {
     });
   }
 
+  expandBounds(bounds: google.maps.LatLngBounds, expansionFactor: number) {
+    let sw = bounds.getSouthWest();
+    let ne = bounds.getNorthEast();
+
+    let latDiff = (ne.lat() - sw.lat()) * expansionFactor;
+    let lngDiff = (ne.lng() - sw.lng()) * expansionFactor;
+    
+    //Expand the northEast and southWest coordinates of the existing bounds.
+    let newSw = new google.maps.LatLng(sw.lat() - latDiff, sw.lng() - lngDiff);
+    let newNe = new google.maps.LatLng(ne.lat() + latDiff, ne.lng() + lngDiff);
+
+    let expandedBounds = new google.maps.LatLngBounds(newSw, newNe);
+    return expandedBounds;
+  }
 
   findStation(origin_coords: google.maps.LatLng,
               destination_coords: google.maps.LatLng)
   {
     //Create a rectangular bound that contains the origin and the destination.
-    let search_bound: google.maps.LatLngBounds = new google.maps.LatLngBounds(origin_coords);
-    search_bound.extend(destination_coords);
+    let search_bounds: google.maps.LatLngBounds = new google.maps.LatLngBounds(origin_coords);
+    search_bounds.extend(destination_coords);
+
+    //Expand the bounds by an expansion factor of 10%.
+    search_bounds = this.expandBounds(search_bounds, 0.1);
     
     //Visualize the bounds
     // let bound_marker = new google.maps.Rectangle({
-    //   bounds:search_bound,
+    //   bounds:search_bounds,
     //   editable:false,
     //   draggable:false,
     //   map: this.#map_object
@@ -352,7 +379,7 @@ export class RoutingAlgorithmService {
     //Search for charging/gas stations within the rectangular search bounds.
     let search_request = {
       query: this.#fuel_queries.get(this.#fuel_type),
-      bounds: search_bound
+      bounds: search_bounds
     };
 
     //Returns an array of all matches within the radius.
@@ -377,10 +404,10 @@ export class RoutingAlgorithmService {
         }
         
         //Ensure the distance matrix remains cost effective.
-        if(station_objects.length > 10)
+        if(station_objects.length > 20)
         {
           //alert(`${station_objects.length} stations were found, but the algorithm will only consider the first 10.`);
-          station_objects.length = 10;
+          station_objects.length = 20;
         }
         this.getDistanceMatrix(origin_coords,
                                destination_coords,
