@@ -12,6 +12,13 @@ type fuel_data = {
   fuel_type: string;
 };
 
+type trip_summary = {
+  trip_distance: any;
+  trip_duration: any;
+  stations_visited: any;
+  time_spent_at_stations: any;
+};
+
 @Component({
   selector: 'embedded-map',
   templateUrl: './map.component.html',
@@ -32,6 +39,13 @@ export class MapComponent implements OnInit {
   #custom_icons!: any;
   #info_window!: google.maps.InfoWindow; 
   #fuel_type: string = "electricity";
+
+  //Trip summary elements
+  #trip_summary_element!: HTMLElement;
+  #trip_distance_element!: HTMLInputElement;
+  #trip_duration_element!: HTMLInputElement;
+  #trip_stations_visited_element!: HTMLInputElement;
+  #trip_time_spent_at_stations_element!: HTMLInputElement;
 
   
   #renderMap()
@@ -71,6 +85,13 @@ export class MapComponent implements OnInit {
 
     //Instantiate the InfoWindow class.
     this.#info_window = new google.maps.InfoWindow();
+
+    //Trip summary elements.
+    this.#trip_summary_element = (document.getElementById("trip_summary_table") as HTMLElement);
+    this.#trip_distance_element = (document.getElementById("trip_distance") as HTMLInputElement);
+    this.#trip_duration_element = (document.getElementById("trip_duration") as HTMLInputElement);
+    this.#trip_stations_visited_element = (document.getElementById("stations_visited") as HTMLInputElement);
+    this.#trip_time_spent_at_stations_element = (document.getElementById("time_spent_at_stations") as HTMLInputElement);
   }
 
   #loadScript()
@@ -95,14 +116,49 @@ export class MapComponent implements OnInit {
     //Initialization work done in ngOnInit lifecycle hook.
   }
 
-  createJourney(data: journey_data)
-  {
-    this.routingAlgorithmService.constructJourney(data, this.#fuel_type, this.#map_object, this.#custom_icons, this.#info_window, this.#places_service, this.#distance_matrix_service, this.#directions_service, this.#directions_render_service);
-  }
-
   changeFuel(data: fuel_data)
   {
     this.#fuel_type = data.fuel_type;
+  }
+
+  displayTripSummary()
+  {
+    //Wait until the trip summary is ready.
+    let trip_stats: any = this.routingAlgorithmService.getTripSummary();
+    if(trip_stats == false)
+    {
+      setTimeout(()=>{this.displayTripSummary()}, 100);
+    }
+    else
+    {
+      //Update the trip summary table.
+      this.#trip_distance_element.value = `${trip_stats.trip_distance}`;
+      this.#trip_duration_element.value = `${trip_stats.trip_duration}`;
+      this.#trip_stations_visited_element.value = `${trip_stats.stations_visited}`;
+      this.#trip_time_spent_at_stations_element.value = `${trip_stats.time_spent_at_stations}`;
+      
+      //Display the updated trip summary table.
+      this.#trip_summary_element.style.visibility = "visible";  
+    }
+  }
+
+  createJourney(data: journey_data)
+  {
+    //Hide the trip summary table.
+    this.#trip_summary_element.style.visibility = "hidden";
+
+    //Compute new journey.
+    this.routingAlgorithmService.constructJourney(data,
+                                                  this.#fuel_type,
+                                                  this.#map_object,
+                                                  this.#custom_icons,
+                                                  this.#info_window,
+                                                  this.#places_service,
+                                                  this.#distance_matrix_service,
+                                                  this.#directions_service,
+                                                  this.#directions_render_service);
+    
+    this.displayTripSummary();
   }
 
 }

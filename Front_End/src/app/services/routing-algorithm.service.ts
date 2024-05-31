@@ -4,7 +4,7 @@ type journey_data = {
   origin_string: string;
   destination_string: string;
   range_string: string;
-}
+};
 
 type station_object = {
   place_id: any;
@@ -17,13 +17,20 @@ type station_object = {
   distance_to_destination: any; //Destination
 };
 
+type trip_summary = {
+  trip_distance: any;
+  trip_duration: any;
+  stations_visited: any;
+  time_spent_at_stations: any;
+};
+
 @Injectable({
   providedIn: 'root'
 })
 export class RoutingAlgorithmService {
 
   //Member Variables
-  static max_depth = 20;
+  static max_depth = 5;
   #origin_data!: any;
   #origin_ready: boolean;
 
@@ -51,11 +58,60 @@ export class RoutingAlgorithmService {
   #custom_icons !: any;
   #custom_markers: google.maps.Marker[] = [];
   #info_window!: google.maps.InfoWindow; 
-  
+
+  //Trip summary object
+  #trip_summary_ready: boolean = false;
+  #trip_summary!: trip_summary;
+
   constructor() 
   { 
     this.#origin_ready = false;
     this.#destination_ready = false;
+  }
+
+
+  getTripSummary()
+  {
+    if(this.#trip_summary_ready)
+    {
+      return this.#trip_summary;
+    }
+    else
+    {
+      return false;
+    }
+  }
+
+
+  computeTripSummary(route_object: google.maps.DirectionsRoute)
+  {
+    //Store the stations visited.
+    let trip_leg_count = route_object.legs.length;
+    this.#trip_summary.stations_visited = (trip_leg_count-1);
+
+    //Compute the time spent at stations.
+    if(this.#fuel_type === "electricity")
+    {
+      this.#trip_summary.time_spent_at_stations = (this.#trip_summary.stations_visited * 50);
+    }
+    else
+    {
+      this.#trip_summary.time_spent_at_stations = (this.#trip_summary.stations_visited * 10);
+    }
+
+    //Compute the trip_distance and trip_duration.
+    for(let i=0; i<trip_leg_count; i++)
+    {
+      //Accumulate trip_distance.
+      this.#trip_summary.trip_distance += route_object.legs[i].distance?.value;
+
+      //Accumulate trip_duration.
+      this.#trip_summary.trip_duration += route_object.legs[i].duration?.value;
+    }
+    this.#trip_summary.trip_distance = Math.round(this.#trip_summary.trip_distance/1000);
+    this.#trip_summary.trip_duration = Math.round(this.#trip_summary.trip_duration/60);
+
+    this.#trip_summary_ready = true;
   }
 
 
@@ -188,6 +244,9 @@ export class RoutingAlgorithmService {
 
         //Use the custom markers to display the route.
         this.createCustomMarkers(sparse_stations);
+
+        //Compute the trip summary stats.
+        this.computeTripSummary(results.routes[0]);
       }
       else
       { 
@@ -527,8 +586,15 @@ export class RoutingAlgorithmService {
                    directions_service: google.maps.DirectionsService,
                    directions_render_service: google.maps.DirectionsRenderer)
   { 
-    //Clear the custom markers.
+    //Clear the custom_markers and trip_summary
     this.clearCustomMarkers();
+    this.#trip_summary_ready = false;
+    this.#trip_summary = {
+      trip_distance: 0,
+      trip_duration: 0,
+      stations_visited: 0,
+      time_spent_at_stations: 0
+    };
 
     //Update member variables with received parameters.
     this.#max_vehicle_range = (parseInt(data.range_string)*1000);

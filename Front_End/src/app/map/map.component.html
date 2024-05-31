@@ -1,2 +1,24 @@
 <section id="embedded_map"></section>
 <app-journey-search (create_journey_event)="createJourney($event)"  (change_fuel_event)="changeFuel($event)"></app-journey-search>
+
+<table id="trip_summary_table" class="secondary_color accent_color">
+    <tr>
+        <th>Trip Summary</th>
+    </tr>
+
+    <tr>
+        <td><label>Trip Distance<input id="trip_distance" class="trip_stats" value="0" readonly>km</label></td>
+    </tr>
+
+    <tr>
+        <td><label>Trip Duration<input id="trip_duration" class="trip_stats" value="0" readonly>mins</label></td>
+    </tr>
+
+    <tr>
+        <td><label>Stations Visited<input id="stations_visited" class="trip_stats" value="0" readonly></label></td>
+    </tr>
+
+    <tr>
+        <td><label>Time Spent At Stations<input id="time_spent_at_stations" class="trip_stats" value="0" readonly>mins</label></td> 
+    </tr>
+</table>
