@@ -237,6 +237,11 @@ export class RoutingAlgorithmService {
         }
         else
         {
+          //Edge Case: No route possible due to insufficient stations.
+          if(current_station == 0)
+          {
+            return null;
+          }
           let chosen_station = station_objects[current_station-1];
           optimal_stations.push(chosen_station);
           travelled_value = (chosen_station.distance_to_origin);
@@ -277,7 +282,7 @@ export class RoutingAlgorithmService {
     let optimal_stations: station_object[]|null = this.optimalStations(station_objects);
     if(optimal_stations == null)
     {
-      alert("No Route 1: No route possible due to insufficient stations.");
+      alert("No Route 1: No route possible due to insufficient stations. Try extending the vehicle range.");
       return;
     }
     
@@ -374,7 +379,7 @@ export class RoutingAlgorithmService {
         //Ensure the distance matrix remains cost effective.
         if(station_objects.length > 10)
         {
-          alert(`${station_objects.length} stations were found, but the algorithm will only consider the first 10.`);
+          //alert(`${station_objects.length} stations were found, but the algorithm will only consider the first 10.`);
           station_objects.length = 10;
         }
         this.getDistanceMatrix(origin_coords,
