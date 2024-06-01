@@ -207,6 +207,88 @@ export class RoutingAlgorithmService {
   }
 
 
+  validStations(optimal_stations: station_object[])
+  {
+    let num_stations = optimal_stations.length;
+
+    //Step 1: Ensure that the first station's distance_to_origin is smaller than current_vehicle_range.
+    if(optimal_stations[0].distance_to_origin > this.#current_vehicle_range)
+    {
+      return null;
+    }
+    //Step 2: Ensure that the last station's distance_to_destination is smaller than current_vehicle_range.
+    if(optimal_stations[num_stations-1].distance_to_destination > this.#current_vehicle_range)
+    {
+      return null;
+    }
+    //If there is only one station, nothing more to do.
+    if(num_stations == 1)
+    {
+      return optimal_stations;
+    }
+    
+    //Step 3: Ensure that the distance between each consecutive station is less than current_vehicle_range.
+    let current_index = 0;
+    while(current_index <= (num_stations-2)) //stop at second last index
+    {
+      let current_station = optimal_stations[current_index];
+      let next_station = optimal_stations[current_index + 1];
+      
+      let distance = next_station.distance_to_origin - current_station.distance_to_origin;
+      if(distance > this.#current_vehicle_range)
+      {
+        return null;
+      }
+      else
+      {
+        current_index+=1;
+      }
+    }
+
+    //Step 4: Delete any stations that are densly spaced:
+    //**Require at least three stations
+    if(num_stations <= 2)
+    {
+      return optimal_stations;
+    }
+      
+    //Consider stations (X,Y,Z): Y is densly spaced if distance between X and Z is less than current_vehicle_range.
+    let sparse_stations: station_object[] = [];
+    let index_x = 0;
+    let index_y = 0;
+    let index_z = 0; 
+    while(index_x <= (num_stations-3))
+    {
+      index_y = index_x+1;
+      index_z = index_y+1;
+
+      let current_station = optimal_stations[index_x];
+      let next_station = optimal_stations[index_z];
+      
+      let distance = next_station.distance_to_origin - current_station.distance_to_origin;
+      if(distance < this.#current_vehicle_range)
+      {
+        sparse_stations.push(current_station);
+        sparse_stations.push(next_station);
+        index_x = index_z;
+      }
+      else
+      {
+        index_x+=1;
+      }
+    }
+
+    if(sparse_stations.length == 0)
+    {
+      return optimal_stations;
+    }
+    else
+    {
+      return sparse_stations;
+    }
+  }
+
+
   optimalStations(station_objects: station_object[])
   {
     let num_stations = station_objects.length;
@@ -218,7 +300,7 @@ export class RoutingAlgorithmService {
     {
       while(current_station<num_stations)
       {
-        //Edge Case: the last station is too far from the destination.
+        //Edge Case 1: the last optimal station is too far from the destination.
         if(current_station == (num_stations-1))
         {
           if(optimal_stations.length == 0)
@@ -237,7 +319,7 @@ export class RoutingAlgorithmService {
         }
         else
         {
-          //Edge Case: No route possible due to insufficient stations.
+          //Edge Case 2: No route possible due to insufficient stations.
           if(current_station == 0 &&
              station_objects[current_station].distance_to_origin > (this.#current_vehicle_range + travelled_value)
           )
@@ -246,6 +328,7 @@ export class RoutingAlgorithmService {
           }
           else
           {
+            //Select stations that are further than 50% of our range relative to the travelled_distance/prev_staion. 
             let chosen_station = station_objects[current_station];
             optimal_stations.push(chosen_station);
             travelled_value = (chosen_station.distance_to_origin);
@@ -254,7 +337,7 @@ export class RoutingAlgorithmService {
         }
       }
 
-      //Edge Case: No route possible due to insufficient stations.
+      //Edge Case 3: No route possible due to insufficient stations.
       let selected_stations = optimal_stations.length;
       if(selected_stations == 0)
       {
@@ -283,21 +366,25 @@ export class RoutingAlgorithmService {
     //Step 1: Sort the station_objects by ascending distance_to_origin.
     station_objects.sort((a,b)=> a.distance_to_origin - b.distance_to_origin);
     
-    
     //Step 2: Make a greedy station selection based on distance_to_origin.
     let optimal_stations: station_object[]|null = this.optimalStations(station_objects);
-
-    //Need to perform sparseStation extraction.(And ensure no distance between chargers is greater than current_vehicle_range).
-
 
     if(optimal_stations == null)
     {
       alert("No Route 1: No route possible due to insufficient stations. Try extending the vehicle range.");
       return;
     }
+
+    //Step 3: Need to ensure that all stations have vaild spacing.
+    let sparse_stations: station_object[]|null = this.validStations(optimal_stations);
+    if(sparse_stations == null)
+    {
+      alert("No Route 2: No route possible due to insufficient stations. Try extending the vehicle range.");
+      return;     
+    }
     
-    //The route is complete, we can render it on the map. 
-    this.renderRoute(optimal_stations); 
+    //Step 4: The route is complete, we can now render it on the map. 
+    this.renderRoute(sparse_stations); 
   }
 
 
@@ -323,7 +410,7 @@ export class RoutingAlgorithmService {
 
       if(status == google.maps.DistanceMatrixStatus.OK && results != null)
       {
-        //Extract the distance/time to origin and distance/time to destination for each station.
+        //Extract the distance to origin and distance to destination for each station.
         for(let i=0; i<station_objects.length; i++)
         {
           let current_station = station_objects[i];
