@@ -3,15 +3,15 @@ import { Injectable, computed } from '@angular/core';
 //Some notes observations.
 //Rectangular Bounds
   //Pro: It is the most efficient in terms of API usage since it only makes 1 distance matrix call per journey.
-  //Con: It is not the most accurate for long journeys because the 20 stations returned by textSearch are not dispersed across the route. 
+  //Con: It is not the most accurate for long journeys because the 10 stations returned by textSearch are not dispersed across the route. 
 
 //Recursive radius
-  //Pro: It is the most accurate because we consider 20 new stations at each 50 km interval.
+  //Pro: It is the most accurate because we consider 10 new stations at each 50 km interval.
   //Con: It is the least efficient because it makes 1 distance matrix call every 50 km to choose a single station.
 
-//Future Algorithm: "Recursive rectangular bounds"
+//Latest Algorithm: "Recursive rectangular bounds"
   //Use rectangular bounds instead of radius to return stations farther than 50km of the "moving_origin"
-  //thus we will make a distance matrix call at every vehical_range interval.
+  //thus we will make a distance matrix call approximately at every vehical_range interval.
 
 
 type journey_data = {
@@ -56,7 +56,7 @@ export class RoutingAlgorithmService {
   #fuel_type = "electricity";
   #fuel_queries = new Map([
     ["electricity", 'Electric vehicle charging station'],
-    ["gasoline", 'Gas station']
+    ["gasoline", 'Gasoline station']
   ]);
   
   //Google Services
