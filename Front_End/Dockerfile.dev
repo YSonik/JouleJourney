@@ -1,0 +1,11 @@
+FROM node 
+
+#Create working directory within container.
+WORKDIR /joulejourney/client
+
+#Install the Angular CLI in the docker image.
+RUN npm install -g @angular/cli
+
+#Install all project dependencies in the docker image. (Manually from within container)
+
+
