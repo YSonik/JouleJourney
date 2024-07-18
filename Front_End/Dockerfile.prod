@@ -1,0 +1,8 @@
+#Apache web server image.
+FROM httpd:latest
+
+#Copy the Angular artifacts into the root of the apache server.
+COPY dist/front-end/browser /usr/local/apache2/htdocs/
+
+
+
